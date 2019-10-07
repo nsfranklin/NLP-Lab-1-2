@@ -1,0 +1,78 @@
+from collections import Counter
+from math import log
+
+# Some useful methods for all exercises:
+def glue_tokens(tokens, order):
+    """A useful way of glueing tokens together for
+    Kneser Ney smoothing and other smoothing methods
+
+    :param: order is the order of the language model
+        (1 = unigram, 2 = bigram, 3 =trigram etc.)
+    """
+    return '{0}@{1}'.format(order,' '.join(tokens))
+def unglue_tokens(tokenstring, order):
+    """Ungluing tokens glued by the glue_tokens method"""
+    if order == 1:
+        return [tokenstring.split("@")[1].replace(" ","")]
+    return tokenstring.split("@")[1].split(" ")
+def tokenize_sentence(sentence, order):
+    """Returns a list of tokens with the correct numbers of initial
+    and end tags (this is meant ot be used with a non-backoff model!!!)
+
+    :sentence: a string of text
+    :param: order is the order of the language model
+        (1 = unigram, 2 = bigram, 3 =trigram etc.)
+    """
+    tokens = sentence.split()
+    tokens = ['<s>'] * (order-1) + tokens + ['</s>']
+    return tokens
+
+# Set of sentences (corpus) from the example in the lecture slides
+sentences = ["I am Sam", "Sam I am", "I do not like green eggs and ham" ]
+
+unigrams = Counter()
+for sent in sentences:
+    words = tokenize_sentence(sent, 1)
+    print("tokenized", words)
+    for w in words:
+        unigrams[w] +=1
+unigram_total = sum(unigrams.values()) # to get the denominator for unigram probabilities
+print (len(unigrams), "different unigrams observed")
+print("unigram total", unigram_total)
+
+s = 0  # total neg log prob mass for cross entropy
+N = 0 # total number of words for normalizing s
+for sent in sentences:
+    # get the unigram model based probability of each sentence
+    words = tokenize_sentence(sent, 1) # tokenize sentence with the order 1 as the parameter
+    sent_s = 0  # recording non-normalized entropy for this sentence
+    sent_N = 0  # total number of words in this sentence (for normalization)
+    for w in words:
+        prob = unigrams[w]/unigram_total
+        logprob = log(prob, 2)  # the log of the prob to base 2
+        s += -log(prob, 2) # add the neg log prob to s
+        sent_s += -log(prob, 2)  # add the neg log prob to sent_s
+        N += 1 # increment the number of total words
+        sent_N += 1 # increment the number of total words in this sentence
+    sent_cross_entropy = sent_s/sent_N
+    sent_perplexity = 2 ** sent_cross_entropy
+    print(words, "cross entropy:", sent_cross_entropy, "perplexity:", sent_perplexity)
+cross_entropy = s/N
+perplexity = 2 ** cross_entropy
+print("unigram corpus cross entropy", cross_entropy)
+print("unigram corpus perplexity", perplexity)
+
+# First get the counts from the training corpus for bigrams without smoothing
+bigrams = Counter() # a counter for how many times a given bigram sequence w_i-1,w_i occurs
+bigram_context = Counter() # a counter for how many times each word is used as a context word w_i-1 (so will include the start symbol)
+delta = 1  # delta is order - 1
+for s in sentences:
+    words = tokenize_sentence(s, 2)  # tokenize sentence with the order 2 as the parameter
+    for i in range(delta, len(words)):
+        context = words[i-delta:i]
+        target = words[i]
+        ngram = context + [target]
+        bigrams[glue_tokens(ngram, 2)] +=1
+        bigram_context[glue_tokens(context, 1)] += 1
+print(len(bigrams.keys()), "different bigrams")
+print(len(bigram_context.keys()), "different bigram contexts (and unigrams) observed")
